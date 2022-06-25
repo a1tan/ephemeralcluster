@@ -193,7 +193,7 @@ service:
   type: ClusterIP
   # Configuration for LoadBalancer service type
   externalIPs: []
-  externalTrafficPolicy: ""
+  externalTrafficPolicy: "Cluster"
 
 # Configure the ingress resource that allows you to access the vcluster
 ingress:
