@@ -109,6 +109,7 @@ vcluster:
     - --disable-scheduler
     - --disable-cloud-controller
     - --flannel-backend=none
+    - --snapshotter=native
   #  - --snapshotter=fuse-overlayfs
   #  - --rootless
   #  - --flannel-iface
