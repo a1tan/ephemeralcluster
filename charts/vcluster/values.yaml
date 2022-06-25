@@ -111,9 +111,9 @@ vcluster:
     - --flannel-backend=none
   #  - --snapshotter=native
   #  - --rootless
-    - --snapshotter=fuse-overlayfs
-    - --rootless
-    - --flannel-iface
+  #  - --snapshotter=fuse-overlayfs
+  #  - --rootless
+  #  - --flannel-iface
     - --kube-controller-manager-arg=controllers=*,-nodeipam,-nodelifecycle,-persistentvolume-binder,-attachdetach,-persistentvolume-expander,-cloud-node-lifecycle
   # Extra arguments for k3s. Make sure the service-cidr is the exact service cidr of the host cluster.
   # If this does not match, you won't be able to create services within the vcluster. You can find out
@@ -193,7 +193,7 @@ service:
   type: ClusterIP
   # Configuration for LoadBalancer service type
   externalIPs: []
-  externalTrafficPolicy: "Cluster"
+  externalTrafficPolicy: ""
 
 # Configure the ingress resource that allows you to access the vcluster
 ingress:
