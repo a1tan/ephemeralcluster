@@ -106,7 +106,6 @@ vcluster:
     - --data-dir=/data
     - --disable=traefik,servicelb,metrics-server,local-storage,coredns
     - --disable-network-policy
-    - --disable-agent
     - --disable-scheduler
     - --disable-cloud-controller
     - --flannel-backend=none
