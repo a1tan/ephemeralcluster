@@ -11,20 +11,10 @@ metadata:
     heritage: "{{ .Release.Service }}"
 rules:
   - apiGroups: [""]
-    resources: ["configmaps", "secrets", "services", "pods", "pods/attach", "pods/portforward", "pods/exec", "persistentvolumeclaims"]
+    resources: ["configmaps", "secrets", "services", "pods", "pods/attach", "pods/portforward", "pods/exec", "endpoints", "persistentvolumeclaims"]
     verbs: ["create", "delete", "patch", "update", "get", "list", "watch"]
-  {{- if .Values.sync.endpoints.enabled }}
   - apiGroups: [""]
-    resources: ["endpoints"]
-    verbs: ["create", "delete", "patch", "update"]
-  {{- end }}
-  {{- if .Values.enableHA }}
-  - apiGroups: ["coordination.k8s.io"]
-    resources: ["leases"]
-    verbs: ["create", "delete", "patch", "update", "get", "list", "watch"]
-  {{- end }}
-  - apiGroups: [""]
-    resources: ["endpoints", "events", "pods/log"]
+    resources: ["events", "pods/log"]
     verbs: ["get", "list", "watch"]
   - apiGroups: ["networking.k8s.io"]
     resources: ["ingresses"]
@@ -53,11 +43,9 @@ rules:
     verbs: ["create", "delete", "patch", "update", "get", "list", "watch"]
   {{- end }}
   {{- if .Values.openshift.enable }}
-  {{- if .Values.sync.endpoints.enabled }}
   - apiGroups: [""]
     resources: ["endpoints/restricted"]
     verbs: ["create"]
-  {{- end }}
   {{- end }}
   {{- include "vcluster.plugin.roleExtraRules" . | indent 2 }}
 {{- end }}

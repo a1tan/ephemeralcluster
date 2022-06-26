@@ -60,17 +60,9 @@ spec:
       {{- if .Values.volumes }}
 {{ toYaml .Values.volumes | indent 8 }}
       {{- end }}
-      {{- if .Values.coredns.enabled }}
-        - name: coredns
-          configMap:
-            name: {{ .Release.Name }}-coredns
-      {{- end }}
       {{- if not .Values.storage.persistence }}
         - name: data
           emptyDir: {}
-      {{- end }}
-      {{- if .Values.priorityClassName }}
-      priorityClassName: {{ .Values.priorityClassName }}
       {{- end }}
       containers:
       {{- if not .Values.vcluster.disabled }}
@@ -89,36 +81,15 @@ spec:
           {{- range $f := .Values.vcluster.baseArgs }}
             {{ $f }}
           {{- end }}
-          {{- if not .Values.sync.nodes.enableScheduler }}
-            --disable-scheduler
-            --kube-controller-manager-arg=controllers=*,-nodeipam,-nodelifecycle,-persistentvolume-binder,-attachdetach,-persistentvolume-expander,-cloud-node-lifecycle
-            --kube-apiserver-arg=endpoint-reconciler-type=none
-          {{- else }}
-            --kube-controller-manager-arg=controllers=*,-nodeipam,-persistentvolume-binder,-attachdetach,-persistentvolume-expander,-cloud-node-lifecycle
-            --kube-apiserver-arg=endpoint-reconciler-type=none
-            --kube-controller-manager-arg=node-monitor-grace-period=1h
-            --kube-controller-manager-arg=node-monitor-period=1h
-          {{- end }}
           {{- if .Values.serviceCIDR }}
             --service-cidr={{ .Values.serviceCIDR }}
-          {{- else }}
-            --service-cidr=$(SERVICE_CIDR)
           {{- end }}
           {{- range $f := .Values.vcluster.extraArgs }}
             {{ $f }}
           {{- end }}
             && true
         env:
-          {{- if .Values.vcluster.env }}
 {{ toYaml .Values.vcluster.env | indent 10 }}
-          {{- end }}
-          {{- if not .Values.serviceCIDR }}
-          - name: SERVICE_CIDR
-            valueFrom:
-              configMapKeyRef:
-                name: "vc-cidr-{{ .Release.Name }}"
-                key: cidr
-          {{- end }}
         securityContext:
 {{ toYaml .Values.securityContext | indent 10 }}
         volumeMounts:
@@ -131,7 +102,7 @@ spec:
         {{- if .Values.syncer.image }}
         image: "{{ .Values.defaultImageRegistry }}{{ .Values.syncer.image }}"
         {{- else }}
-        image: "{{ .Values.defaultImageRegistry }}loftsh/vcluster:{{ .Chart.Version }}"
+        image: "{{ .Values.defaultImageRegistry }}loftsh/vcluster:latest"
         {{- end }}
         {{- if .Values.syncer.workingDir }}
         workingDir: {{ .Values.syncer.workingDir }}
@@ -145,15 +116,6 @@ spec:
         {{- if not .Values.syncer.noArgs }}
         args:
           - --name={{ .Release.Name }}
-          - --service-account=vc-workload-{{ .Release.Name }}
-          {{- range $key, $container := .Values.plugin }}
-          {{- if not $container.optional }}
-          - --plugins={{ $key }}
-          {{- end }}
-          {{- end }}
-          {{- if .Values.sync.nodes.enableScheduler }}
-          - --enable-scheduler
-          {{- end }}
           {{- if .Values.defaultImageRegistry }}
           - --default-image-registry={{ .Values.defaultImageRegistry }}
           {{- end }}
@@ -173,8 +135,6 @@ spec:
           {{- range $f := .Values.syncer.extraArgs }}
           - {{ $f | quote }}
           {{- end }}
-          {{- include "vcluster.serviceMapping.fromHost" . | indent 10 }}
-          {{- include "vcluster.serviceMapping.fromVirtual" . | indent 10 }}
         {{- else }}
         args:
 {{ toYaml .Values.syncer.extraArgs | indent 10 }}
@@ -186,7 +146,7 @@ spec:
             path: /healthz
             port: 8443
             scheme: HTTPS
-          failureThreshold: 60
+          failureThreshold: 10
           initialDelaySeconds: 60
           periodSeconds: 2
         {{- end }}
@@ -198,33 +158,20 @@ spec:
             path: /readyz
             port: 8443
             scheme: HTTPS
-          failureThreshold: 60
+          failureThreshold: 30
           periodSeconds: 2
         {{- end }}
         {{- end }}
         securityContext:
 {{ toYaml .Values.securityContext | indent 10 }}
-        env:          
-          {{- if .Values.syncer.env }}
+        env:
 {{ toYaml .Values.syncer.env | indent 10 }}
-          {{- end }}
-          - name: POD_IP
-            valueFrom:
-              fieldRef:
-                fieldPath: status.podIP
         volumeMounts:
-        {{- if .Values.coredns.enabled }}
-          - name: coredns
-            mountPath: /manifests/coredns
-            readOnly: true
-        {{- end }}
 {{ toYaml .Values.syncer.volumeMounts | indent 10 }}
         resources:
 {{ toYaml .Values.syncer.resources | indent 10 }}
       {{- end }}
-      {{- $counter := -1 -}}
       {{- range $key, $container := .Values.plugin }}
-      {{- $counter = add1 $counter }}
       - image: {{ $.Values.defaultImageRegistry }}{{ $container.image }}
         {{- if $container.name }}
         name: {{ $container.name | quote }}
@@ -256,13 +203,7 @@ spec:
         terminationMessagePolicy: {{ $container.terminationMessagePolicy }}
         {{- end }}
         env:
-          - name: VCLUSTER_PLUGIN_ADDRESS
-            value: "localhost:{{ add 14000 $counter }}"
-          - name: VCLUSTER_PLUGIN_NAME
-            value: "{{ $key }}"
-        {{- if $container.env }}
 {{ toYaml $container.env | indent 10 }}
-        {{- end }}
         envFrom:
 {{ toYaml $container.envFrom | indent 10 }}
         securityContext:
