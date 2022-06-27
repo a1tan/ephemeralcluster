@@ -57,13 +57,16 @@ spec:
       serviceAccountName: vc-{{ .Release.Name }}
       {{- end }}
       volumes:
-      {{- if .Values.volumes }}
-{{ toYaml .Values.volumes | indent 8 }}
-      {{- end }}
+        - name: k0s-config
+          secret:
+            secretName: vc-{{ .Release.Name }}-config
       {{- if .Values.coredns.enabled }}
         - name: coredns
           configMap:
             name: {{ .Release.Name }}-coredns
+      {{- end }}
+      {{- if .Values.volumes }}
+{{ toYaml .Values.volumes | indent 8 }}
       {{- end }}
       {{- if not .Values.storage.persistence }}
         - name: data
@@ -76,49 +79,31 @@ spec:
       {{- if not .Values.vcluster.disabled }}
       - image: {{ .Values.defaultImageRegistry }}{{ .Values.vcluster.image }}
         name: vcluster
-        # k3s has a problem running as pid 1 and disabled agents on cgroupv2
-        # nodes as it will try to evacuate the cgroups there. Starting k3s
-        # through a shell makes it non pid 1 and prevents this from happening
         command:
-          - /bin/sh
+          {{- range $f := .Values.vcluster.command }}
+          - {{ $f | quote }}
+          {{- end }}
         args:
-          - -c
-          - {{ range $f := .Values.vcluster.command -}}
-            {{ $f }}
-            {{- end }}
           {{- range $f := .Values.vcluster.baseArgs }}
-            {{ $f }}
+          - {{ $f | quote }}
           {{- end }}
           {{- if not .Values.sync.nodes.enableScheduler }}
-            --disable-scheduler
-            --kube-controller-manager-arg=controllers=*,-nodeipam,-nodelifecycle,-persistentvolume-binder,-attachdetach,-persistentvolume-expander,-cloud-node-lifecycle
-            --kube-apiserver-arg=endpoint-reconciler-type=none
+          - --disable-components=konnectivity-server,kube-scheduler,csr-approver,default-psp,kube-proxy,coredns,network-provider,helm,metrics-server,kubelet-config
           {{- else }}
-            --kube-controller-manager-arg=controllers=*,-nodeipam,-persistentvolume-binder,-attachdetach,-persistentvolume-expander,-cloud-node-lifecycle
-            --kube-apiserver-arg=endpoint-reconciler-type=none
-            --kube-controller-manager-arg=node-monitor-grace-period=1h
-            --kube-controller-manager-arg=node-monitor-period=1h
-          {{- end }}
-          {{- if .Values.serviceCIDR }}
-            --service-cidr={{ .Values.serviceCIDR }}
-          {{- else }}
-            --service-cidr=$(SERVICE_CIDR)
+          - --disable-components=konnectivity-server,csr-approver,default-psp,kube-proxy,coredns,network-provider,helm,metrics-server,kubelet-config
           {{- end }}
           {{- range $f := .Values.vcluster.extraArgs }}
-            {{ $f }}
+          - {{ $f | quote }}
           {{- end }}
-            && true
         env:
           {{- if .Values.vcluster.env }}
 {{ toYaml .Values.vcluster.env | indent 10 }}
           {{- end }}
-          {{- if not .Values.serviceCIDR }}
-          - name: SERVICE_CIDR
+          - name: CONFIG_READY
             valueFrom:
-              configMapKeyRef:
-                name: "vc-cidr-{{ .Release.Name }}"
-                key: cidr
-          {{- end }}
+              secretKeyRef:
+                name: "vc-{{ .Release.Name }}-config"
+                key: CONFIG_READY
         securityContext:
 {{ toYaml .Values.securityContext | indent 10 }}
         volumeMounts:
@@ -131,7 +116,7 @@ spec:
         {{- if .Values.syncer.image }}
         image: "{{ .Values.defaultImageRegistry }}{{ .Values.syncer.image }}"
         {{- else }}
-        image: "{{ .Values.defaultImageRegistry }}loftsh/vcluster:latest"
+        image: "{{ .Values.defaultImageRegistry }}loftsh/vcluster:{{ .Chart.Version }}"
         {{- end }}
         {{- if .Values.syncer.workingDir }}
         workingDir: {{ .Values.syncer.workingDir }}
@@ -146,11 +131,18 @@ spec:
         args:
           - --name={{ .Release.Name }}
           - --service-account=vc-workload-{{ .Release.Name }}
+          - --request-header-ca-cert=/data/k0s/pki/ca.crt
+          - --client-ca-cert=/data/k0s/pki/ca.crt
+          - --server-ca-cert=/data/k0s/pki/ca.crt
+          - --server-ca-key=/data/k0s/pki/ca.key
+          - --kube-config=/data/k0s/pki/admin.conf
           {{- range $key, $container := .Values.plugin }}
           {{- if not $container.optional }}
           - --plugins={{ $key }}
           {{- end }}
           {{- end }}
+          {{- include "vcluster.serviceMapping.fromHost" . | indent 10 }}
+          {{- include "vcluster.serviceMapping.fromVirtual" . | indent 10 }}
           {{- if .Values.sync.nodes.enableScheduler }}
           - --enable-scheduler
           {{- end }}
@@ -163,7 +155,7 @@ spec:
           {{- if .Values.isolation.enabled }}
           - --enforce-pod-security-standard={{ .Values.isolation.podSecurityStandard }}
           {{- end}}
-          {{- include "vcluster.syncer.syncArgs" . | indent 10 }}
+          {{- include "vcluster.syncer.syncArgs" . | indent 10 -}}
           {{- if .Values.sync.nodes.syncAllNodes }}
           - --sync-all-nodes
           {{- end }}
@@ -173,8 +165,6 @@ spec:
           {{- range $f := .Values.syncer.extraArgs }}
           - {{ $f | quote }}
           {{- end }}
-          {{- include "vcluster.serviceMapping.fromHost" . | indent 10 }}
-          {{- include "vcluster.serviceMapping.fromVirtual" . | indent 10 }}
         {{- else }}
         args:
 {{ toYaml .Values.syncer.extraArgs | indent 10 }}
@@ -186,7 +176,7 @@ spec:
             path: /healthz
             port: 8443
             scheme: HTTPS
-          failureThreshold: 60
+          failureThreshold: 10
           initialDelaySeconds: 60
           periodSeconds: 2
         {{- end }}
@@ -198,20 +188,14 @@ spec:
             path: /readyz
             port: 8443
             scheme: HTTPS
-          failureThreshold: 60
+          failureThreshold: 30
           periodSeconds: 2
         {{- end }}
         {{- end }}
         securityContext:
 {{ toYaml .Values.securityContext | indent 10 }}
-        env:          
-          {{- if .Values.syncer.env }}
+        env:
 {{ toYaml .Values.syncer.env | indent 10 }}
-          {{- end }}
-          - name: POD_IP
-            valueFrom:
-              fieldRef:
-                fieldPath: status.podIP
         volumeMounts:
         {{- if .Values.coredns.enabled }}
           - name: coredns

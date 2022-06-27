@@ -1,6 +1,6 @@
 apiVersion: v2
-name: vcluster
-description: vcluster - Virtual Kubernetes Clusters
+name: vcluster-k0s
+description: vcluster - Virtual Kubernetes Clusters (k0s)
 home: https://vcluster.com
 icon: https://static.loft.sh/branding/logos/vcluster/vertical/vcluster_vertical.svg
 keywords:

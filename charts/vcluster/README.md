@@ -1,4 +1,4 @@
-## vcluster
+## vcluster (k0s)
 
 ### **[GitHub](https://github.com/loft-sh/vcluster)** • **[Website](https://www.vcluster.com)** • **[Quickstart](https://www.vcluster.com/docs/getting-started/setup)** • **[Documentation](https://www.vcluster.com/docs/what-are-virtual-clusters)** • **[Blog](https://loft.sh/blog)** • **[Twitter](https://twitter.com/loft_sh)** • **[Slack](https://slack.loft.sh/)**
 
@@ -19,7 +19,7 @@ See [helm repo](https://helm.sh/docs/helm/helm_repo/) for command documentation.
 ## Install Helm Chart
 
 ```
-helm upgrade [RELEASE_NAME] loft-sh/vcluster -n [RELEASE_NAMESPACE] --create-namespace --install
+helm upgrade [RELEASE_NAME] loft-sh/vcluster-k0s -n [RELEASE_NAMESPACE] --create-namespace --install
 ```
 
 See [vcluster docs](https://vcluster.com/docs) for configuration options.
