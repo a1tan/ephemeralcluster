@@ -2,6 +2,8 @@
 # images within the vcluster will not be rewritten.
 defaultImageRegistry: ""
 
+serviceCIDR: "10.96.0.0/12"
+
 # Plugins that should get loaded. Usually you want to apply those via 'vcluster create ... -f https://.../plugin.yaml'
 plugin: {}
 # Manually configure a plugin called test
